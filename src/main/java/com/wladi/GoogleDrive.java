@@ -15,6 +15,7 @@ import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.http.FileContent;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
@@ -29,7 +30,7 @@ public class GoogleDrive {
   public static final String APPLICATION_NAME = "ServicoTeste";
   public static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
   public static final String TOKENS_DIRECTORY_PATH = "tokens";
-  public static final List<String> SCOPES = Collections.singletonList(DriveScopes.DRIVE_READONLY);
+  public static final List<String> SCOPES = Collections.singletonList(DriveScopes.DRIVE);
   public static final String CREDENTIALS_FILE_PATH = "authentication/credentials.json";
   public static Drive service;
   public static FileOutputStream fileOutputStream;
@@ -45,8 +46,7 @@ public class GoogleDrive {
     if (in.equals(null)) {throw new FileNotFoundException("Arquivo não encontrado: " + CREDENTIALS_FILE_PATH);}
 
     GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
-    GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
-      HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
+    GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
       .setDataStoreFactory(new FileDataStoreFactory(new java.io.File(TOKENS_DIRECTORY_PATH)))
       .setAccessType("offline")
       .build();
@@ -67,9 +67,22 @@ public class GoogleDrive {
     }    
   }
 
-  public static List<File> getList() throws IOException {
+  public static void upload(String arquivoNome) throws IOException {
+    File fileMetadata = new File();
+    fileMetadata.setName(arquivoNome);
+
+    java.io.File filePath = new java.io.File(arquivoNome);
+    FileContent mediaContent = new FileContent(null, filePath);
+    try {
+      File file = service.files().create(fileMetadata, mediaContent).execute();
+      System.out.println(file.getName());
+      System.out.println("Upload realizado.");
+    } catch (Exception e) { System.out.println("Erro: " + e); }
+  }
+
+  public static List<File> getList(Integer tamanho) throws IOException {
     
-    FileList result = service.files().list().setPageSize(1).execute();
+    FileList result = service.files().list().setPageSize(tamanho).execute();
     List<File> files = result.getFiles();
     
     if(files.isEmpty()){System.out.println("Lista está vazia.");} else{System.out.println("Arquivos encontrados.");}
@@ -80,8 +93,9 @@ public class GoogleDrive {
   public static void main(String... args) throws IOException, GeneralSecurityException {
 
     authentication();
-    download(getList());
-
+    upload("alterações.docx");
+    download(getList(4));
+  
   }
 
 }
