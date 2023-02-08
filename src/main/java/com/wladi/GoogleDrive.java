@@ -26,26 +26,30 @@ import com.google.api.services.drive.model.FileList;
 
 public class GoogleDrive {
 
-  private static final String APPLICATION_NAME = "ServicoTeste";
-  private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
-  private static final String TOKENS_DIRECTORY_PATH = "tokens";
-  private static final List<String> SCOPES = Collections.singletonList(DriveScopes.DRIVE_READONLY);
-  private static final String CREDENTIALS_FILE_PATH = "credentials.json";
+  public static final String APPLICATION_NAME = "ServicoTeste";
+  public static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
+  public static final String TOKENS_DIRECTORY_PATH = "tokens";
+  public static final List<String> SCOPES = Collections.singletonList(DriveScopes.DRIVE_READONLY);
+  public static final String CREDENTIALS_FILE_PATH = "authentication/credentials.json";
+  public static Drive service;
+  public static FileOutputStream fileOutputStream;
 
-  private static Credential getCredentials(final NetHttpTransport HTTP_TRANSPORT) throws IOException {
 
+  public static void authentication() throws GeneralSecurityException, IOException {
+    final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
+    service = new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, getCredentials(HTTP_TRANSPORT)).setApplicationName(APPLICATION_NAME).build();
+  }
+
+  public static Credential getCredentials(final NetHttpTransport HTTP_TRANSPORT) throws IOException {
     InputStream in = GoogleDrive.class.getResourceAsStream(CREDENTIALS_FILE_PATH);
-
-    if (in == null) {
-      throw new FileNotFoundException("Arquivo não encontrado: " + CREDENTIALS_FILE_PATH);
-    }
+    if (in.equals(null)) {throw new FileNotFoundException("Arquivo não encontrado: " + CREDENTIALS_FILE_PATH);}
 
     GoogleClientSecrets clientSecrets = GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
     GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
-        HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
-        .setDataStoreFactory(new FileDataStoreFactory(new java.io.File(TOKENS_DIRECTORY_PATH)))
-        .setAccessType("offline")
-        .build();
+      HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
+      .setDataStoreFactory(new FileDataStoreFactory(new java.io.File(TOKENS_DIRECTORY_PATH)))
+      .setAccessType("offline")
+      .build();
 
     LocalServerReceiver receiver = new LocalServerReceiver.Builder().setPort(8080).build();
     Credential credential = new AuthorizationCodeInstalledApp(flow, receiver).authorize("user");
@@ -53,34 +57,31 @@ public class GoogleDrive {
     return credential;
   }
 
+  public static void download(List<File> files) throws IOException {
+    for (File file : files) {
+      try {
+        fileOutputStream = new FileOutputStream(file.getName());
+        service.files().get(file.getId()).executeMediaAndDownloadTo(fileOutputStream);
+        System.out.println("Download realizado.");
+      } catch (Exception e) { System.out.println("Erro: " + e); }
+    }    
+  }
+
+  public static List<File> getList() throws IOException {
+    
+    FileList result = service.files().list().setPageSize(1).execute();
+    List<File> files = result.getFiles();
+    
+    if(files.isEmpty()){System.out.println("Lista está vazia.");} else{System.out.println("Arquivos encontrados.");}
+    
+    return files;
+  }
+
   public static void main(String... args) throws IOException, GeneralSecurityException {
 
-    final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
-    Drive service = new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, getCredentials(HTTP_TRANSPORT))
-        .setApplicationName(APPLICATION_NAME)
-        .build();
-    
-    FileOutputStream fileOutputStream;
-    FileList result = service.files().list()
-        .setPageSize(2)
-        .setFields("nextPageToken, files(id, name)")
-        .execute();
+    authentication();
+    download(getList());
 
-    List<File> files = result.getFiles();
-    if (files == null || files.isEmpty()) {
-      System.out.println("Não existem dados a serem exibidos.");
-    } else {
-      System.out.println("Arquivos:");
-      for (File file : files) {
-        try {
-          fileOutputStream = new FileOutputStream(file.getName());
-          service.files().get(file.getId()).executeMediaAndDownloadTo(fileOutputStream);
-        } catch (Exception e) {
-           System.out.println(e);
-        }
-         
-      }
-    }
   }
 
 }
