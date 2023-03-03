@@ -35,7 +35,6 @@ public class GoogleDrive {
   public static Drive service;
   public static FileOutputStream fileOutputStream;
 
-
   public static void authentication() throws GeneralSecurityException, IOException {
     final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
     service = new Drive.Builder(HTTP_TRANSPORT, JSON_FACTORY, getCredentials(HTTP_TRANSPORT)).setApplicationName(APPLICATION_NAME).build();
@@ -57,7 +56,7 @@ public class GoogleDrive {
     return credential;
   }
 
-  public static void download(List<File> files) throws IOException {
+  public static void downloadList(List<File> files) throws IOException {
     for (File file : files) {
       try {
         fileOutputStream = new FileOutputStream(file.getName());
@@ -67,7 +66,30 @@ public class GoogleDrive {
     }    
   }
 
-  public static void upload(String arquivoNome) throws IOException {
+  public static void download(String id, String nome) {
+    try {
+      fileOutputStream = new FileOutputStream(nome);
+      service.files().get(id).executeMediaAndDownloadTo(fileOutputStream);
+      System.out.println("Download realizado.");
+    } catch (Exception e) { System.out.println("Erro: " + e); }  
+  }
+ 
+  public static void uploadList(List<File> files) {
+    for (File file : files) {
+      File fileMetadata = new File();
+      fileMetadata.setName(file.getName());
+
+      java.io.File filePath = new java.io.File(file.getName());
+      FileContent mediaContent = new FileContent(null, filePath);
+      try {
+        file = service.files().create(fileMetadata, mediaContent).execute();
+        System.out.println(file.getName());
+        System.out.println("Upload realizado.");
+      } catch (Exception e) {System.out.println("Erro: " + e);}
+    }
+  }
+
+  public static String upload(String arquivoNome) throws IOException {
     File fileMetadata = new File();
     fileMetadata.setName(arquivoNome);
 
@@ -75,27 +97,22 @@ public class GoogleDrive {
     FileContent mediaContent = new FileContent(null, filePath);
     try {
       File file = service.files().create(fileMetadata, mediaContent).execute();
-      System.out.println(file.getName());
       System.out.println("Upload realizado.");
-    } catch (Exception e) { System.out.println("Erro: " + e); }
+      return file.getId();
+    } catch (Exception e) {
+      System.out.println("Erro: " + e); 
+      return null;
+    }
   }
 
   public static List<File> getList(Integer tamanho) throws IOException {
     
     FileList result = service.files().list().setPageSize(tamanho).execute();
     List<File> files = result.getFiles();
-    
+    System.out.println(result.getFiles().get(0).getId());
     if(files.isEmpty()){System.out.println("Lista está vazia.");} else{System.out.println("Arquivos encontrados.");}
     
     return files;
-  }
-
-  public static void main(String... args) throws IOException, GeneralSecurityException {
-
-    authentication();
-    upload("alterações.docx");
-    download(getList(4));
-  
   }
 
 }
